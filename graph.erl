@@ -1,4 +1,4 @@
--module(graphcolor).
+-module(graph).
 -import(abel,[send/2,recv/2,choice/2,parallel/2,att/2,this/1]).
 -export([d/1,f/1,a/1,t/1]).
 

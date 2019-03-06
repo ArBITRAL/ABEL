@@ -1,53 +1,62 @@
 -module(vertex).
 -import(abel,[send/2,recv/2,choice/2,parallel/2,att/2,this/1]).
--export([d/1,f/1,a/1,t/1]).
+
+%% to be called by coordinator
+-export([init_beh/1]).
+
+init_beh(C) ->
+    F = fun() -> f(C) end,
+    T = fun() -> t(C) end,
+    D = fun() -> d(C) end,
+    A = fun() -> a(C) end,
+    [F,T,D,A].
 
 %% Process F
 f(C) ->
     %% define messages, predicates, updates
-    AP = fun(E) -> att(send,E) andalso not att(assigned, E) end,
-    Msg = {'try', fun(E) -> min_colour(att(used,E)) end, this(round)},
-    SP = fun(E1, E2) -> lists:member(att(id,E1), att(nlist, E2)) end,
+    G = fun(E) -> att(send,E) andalso not att(assigned, E) end,
+    M = {'try', fun(E) -> min_colour(att(used,E)) end, this(round)},
+    SP = fun(E1, E2) -> lists:member(att(id,E1), att(nbr, E2)) end,
     U = [{send, false}, {colour, fun(E) -> min_colour(att(used,E)) end}],
-    Act = {AP, Msg, SP, U},
+    Act = {G, M, SP, U},
 
     send(C, Act),
     f(C).
 
 %% Process T
 t(C) ->
-    RP1 = fun(E1, E2, Msg) -> size(Msg) == 3 andalso
-				   element(1,Msg) == 'try' andalso
+    RP1 = fun(E1, E2, M) -> size(M) == 3 andalso
+				   element(1,M) == 'try' andalso
 				   att(id,E1) > att(id,E2) andalso
-				   att(round,E1) == element(3,Msg)
+				   att(round,E1) == element(3,M)
 		       end,
     U1 = [{counter, fun(E,_) -> att(counter,E) + 1 end}],
 
-    RP2 = fun(E1, E2, Msg) ->
-			  size(Msg) == 3 andalso
-			      element(1,Msg) == 'try' andalso
+    RP2 = fun(E1, E2, M) ->
+			  size(M) == 3 andalso
+			      element(1,M) == 'try' andalso
 			      att(id,E1) < att(id,E2) andalso
-			      att(round,E1) == element(3,Msg)
+			      att(round,E1) == element(3,M)
 		  end,
     U2  = [{counter, fun(E,_) -> att(counter, E) + 1 end},
-	   {constraints, fun(E,Msg) -> sets:add_element(element(2,Msg),att(constraints,E)) end}],
+	   {constraints, fun(E,M) -> sets:add_element(element(2,M),att(constraints,E)) end}],
 
-    RP3 = fun(E1, E2, Msg) ->
-		  size(Msg) == 3 andalso
-		      element(1,Msg) == 'try' andalso
+    RP3 = fun(E1, E2, M) ->
+		  size(M) == 3 andalso
+		      element(1,M) == 'try' andalso
 		      att(id,E1) > att(id,E2) andalso
-		      att(round,E1) < element(3,Msg)
+		      att(round,E1) < element(3,M)
 		  end,
-    U3 = [{round, fun(_,Msg) -> element(3,Msg) end}, {send, true}, {counter, 1},
+    U3 = [{round, fun(_,M) -> element(3,M) end}, {send, true}, {counter, 1},
 	  {constraints, sets:new()}],
-    RP4 = fun(E1, E2, Msg) ->
-			  size(Msg) == 3 andalso
-			      element(1,Msg) == 'try' andalso
+    RP4 = fun(E1, E2, M) ->
+			  size(M) == 3 andalso
+			      element(1,M) == 'try' andalso
 			      att(id,E1) < att(id,E2) andalso
-			      att(round,E1) < element(3,Msg)
+			      att(round,E1) < element(3,M)
 		  end,
-    U4 = [{round, fun(_,Msg) -> element(3,Msg) end}, {send, true}, {counter, 1},
-	  {constraints, fun(_,Msg) -> sets:add_element(element(2,Msg),sets:new()) end}],
+    U4 = [{round, fun(_,M) -> element(3,M) end}, {send, true}, {counter, 1},
+	  {constraints, fun(_,M) -> sets:add_element(element(2,M),sets:new()) end}],
 
     Act1 = {RP1,U1},
     Act2 = {RP2,U2},
@@ -60,43 +69,45 @@ t(C) ->
 
 %% Process D
 d(C) ->
-    RP1 = fun(E1,E2,Msg) ->
-		    size(Msg) == 3 andalso
-			element(1,Msg) == 'done' andalso
-			att(round, E1) >= element(3,Msg)
+    RP1 = fun(E1,_,M) ->
+		    size(M) == 3 andalso
+			element(1,M) == 'done' andalso
+			att(round, E1) >= element(3,M)
 		  end,
     U1 = [{done, fun(E,_) -> att(done,E) + 1 end},
-	  {used, fun(E,Msg) -> sets:add_element(element(2,Msg),att(used,E)) end}],
-    RP2 = fun(E1,E2,Msg) ->
-		  size(Msg) == 3 andalso
-		      element(1,Msg) == 'done' andalso
-		      att(round,E1) < element(3,Msg)
+	  {used, fun(E,M) -> sets:add_element(element(2,M),att(used,E)) end}],
+    RP2 = fun(E1,_,M) ->
+		  size(M) == 3 andalso
+		      element(1,M) == 'done' andalso
+		      att(round,E1) < element(3,M)
 	  end,
-    U2 = [{round, fun(_,Msg) -> element(3,Msg) end},
+    U2 = [{round, fun(_,M) -> element(3,M) end},
 	     {done, fun(E,_) -> att(done,E) + 1 end},
 	     {constraints, sets:new()},
 	     {send, true},
 	     {counter, 0},
-	     {used, fun(E,Msg) -> sets:add_element(element(2,Msg),att(used,E)) end}],
+	     {used, fun(E,M) -> sets:add_element(element(2,M),att(used,E)) end}],
 
     Act1 = {RP1,U1},
     Act2 = {RP2,U2},
     DRef = fun() -> d(C) end,
+
     choice(C, [{Act1, DRef}, {Act2, DRef}]).
 
 %% Process A
 a(C) ->
-    AP = fun(E) -> att(colour,E) > 0 andalso
-		     att(counter, E) == length(att(nlist, E)) - att(done,E)
+    G = fun(E) -> att(colour,E) > 0 andalso
+		     att(counter, E) == length(att(nbr, E)) - att(done,E)
 		     andalso not
 		     sets:is_element(att(colour,E), sets:union(att(constraints,E),att(used,E)))
 	 end,
-    Msg = {'done', this(colour), fun(E) -> att(round,E) + 1 end},
+    M = {'done', this(colour), fun(E) -> att(round,E) + 1 end},
     SP = fun(E1,E2) ->
-		 lists:member(att(id,E1), att(nlist,E2))
+		 lists:member(att(id,E1), att(nbr,E2))
 	 end,
     U = [{assigned, true}],
-    Act = {AP,Msg,SP,U},
+
+    Act = {G,M,SP,U},
     send(C,Act).
 
 

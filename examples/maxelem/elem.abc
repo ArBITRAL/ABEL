@@ -1,0 +1,17 @@
+component Elem
+	  attributes: n,s
+	  observables: s
+	  behaviour:
+	  let {
+	      A := <s = 1>(n)@(true).nil
+
+	      B := (x >= this.n)(x).[s := 0]nil
+
+	   }
+	   init  A | B
+end
+
+
+%%C1: Vertex (id -> 1, nbr -> [2], colour -> 0, round -> 0, done -> 0, send -> 1, assigned -> 0, used -> [], counter -> 0, constraints -> [])
+%%C2: Vertex (id -> 2, nbr -> [1], colour -> 0, round -> 0, done -> 0, send -> 1, assigned -> 0, used -> [], counter -> 0, constraints -> [])
+%%C3: Vertex (id -> 3, nbr -> [1,2], colour -> 0, round -> 0, done -> 0, send -> 1, assigned -> 0, used -> [], counter -> 0, constraints -> [])

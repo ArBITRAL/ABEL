@@ -3,11 +3,13 @@
 
 -export([start/1,start/2]).
 
--export([new_component/3,start_component/1]).
+-export([new_component/3,start_component/1, append/2]).
 
--export([send/2,recv/2,choice/2,parallel/2]).
+-export([choice/3,parallel/3,prefix/3,call/3,var/2,att/2,msg/2]).
 
--export([this/1,att/2]).
+%% testing
+
+-export([pretty_format/1,pretty_format_choice/1]).
 
 %% Infrastructure
 start(T) ->
@@ -19,64 +21,80 @@ start(T,Mode) ->
 
 %% Components
 new_component(M, Env, I) ->
-    {ok, C} = abel_coord:start_component(M, Env, I),
+    {ok, C} = abel_coord:new_component(M, Env, I),
     C. %separate this two for handling massive initializations
 
 start_component(C) ->
-    abel_coord:start_beh(C).
+    abel_coord:start_component(C).
 
-%% Processes
-%% send & receive interface
-send(C, Act) ->
-    OutAct = pretty_format(Act),
-    Ack = abel_coord:action(C, OutAct),
-    Ack.
-
-recv(C, Act) ->
-    InAct = pretty_format(Act),
-    Ack = abel_coord:action(C, InAct),
-    Ack.
+prefix(C,V, {Act,Con}) ->
+    {Type, SomeAct} = pretty_format(Act),
+    {F,A} = abel_coord:prefix(C, {Type, SomeAct, Con}),
+    A2 = append(A,V),
+    app(F,A2).
 
 %% chocice
-choice(C, BehList) ->
-    BList2 = [{pretty_format(Act),Con} || {Act,Con} <- BehList],
-    {Ret, F} = abel_coord:choice(C,BList2),
-    if not is_atom(F) ->
-	    case erlang:fun_info(F,arity) of
-		{_, 0} -> F();
-		_ -> F(Ret)
-	    end;
-       true -> ok
-    end.
-%% interleaving
-parallel(C, L) when is_list(L) ->
-    abel_coord:par(C, L).
+choice(C, V, BehList) ->
+    {Type, Choice} = pretty_format_choice(BehList),
+    {F,A} = abel_coord:choice(C, {Type, Choice}),
+    A2 = append(A,V),
+    app(F,A2).
 
-%% attributes helpfers
-this(A) when is_atom(A) ->
-    fun(E) ->
-	    maps:get(A,E)
-    end.
+%% interleaving
+parallel(C, V, L) when is_list(L) ->
+    L2 = [fun() -> F(V) end || F <- L],
+    abel_coord:par(C, L2).
+
+call(C,V,F) ->
+    abel_coord:par(C, [fun() -> F(V) end]).
+
+app(nil,_) ->
+    nil;
+app(F,A) ->
+    F(A).
+
+%% new bound variables
+append([], L) -> L;
+append(X, L) ->
+    F = fun({K,_} = Y,Acc) ->
+		case proplists:is_defined(K,Acc) of
+		    false ->
+			[Y | Acc];
+		    true ->
+			lists:keyreplace(K, 1, Acc, Y)
+		end
+	end,
+    lists:foldl(F,L,X).
+
+
+msg(I,M) ->
+    element(I,M).
+
+var(X,Var) ->
+    proplists:get_value(X,Var).
 
 att(A,E) ->
     maps:get(A,E).
 
-
-
 %% internal formatting functions
 pretty_format({Msg,Pred}) when is_tuple(Msg) andalso is_function(Pred) ->
-    {send, fun(_) -> true end, Msg, Pred, []};
-pretty_format({G,Msg,Pred}) when is_function(G) andalso is_function(Pred) andalso is_tuple(Msg) ->
-    {send, G, Msg, Pred, []};
+    {send, {fun(_) -> true end, Msg, Pred, []}};
+pretty_format({G,Msg,Pred}) when is_function(G) andalso is_tuple(Msg) andalso is_function(Pred) ->
+    {send, {G, Msg, Pred, []}};
 pretty_format({Msg,Pred,U}) when is_tuple(Msg) andalso is_function(Pred) andalso is_list(U) ->
-    {send, fun(_) -> true end, Msg, Pred, U};
+    {send, {fun(_) -> true end, Msg, Pred, U}};
 pretty_format({G,Msg,Pred,U}) when is_function(G) andalso is_tuple(Msg) andalso is_function(Pred) andalso is_list(U) ->
-    {send,G,Msg,Pred,U};
-pretty_format(Pred) when is_function(Pred) ->
-    {recv, fun(_) -> true end, Pred, []};
-pretty_format({G,Pred}) when is_function(G) andalso is_function(Pred) ->
-    {recv, G, Pred, []};
-pretty_format({Pred,U}) when is_function(Pred) andalso is_list(U) ->
-    {recv, fun(_) -> true end, Pred, U};
-pretty_format({G,Pred,U}) when is_function(G) andalso is_function(Pred) andalso is_list(U)  ->
-    {recv,G,Pred,U}.
+    {send,{G,Msg,Pred,U}};
+pretty_format({Pred,X}) when is_function(Pred) andalso is_tuple(X) ->
+    {recv,{fun(_) -> true end, Pred, X, []}};
+pretty_format({G,Pred,X}) when is_function(G) andalso is_function(Pred) andalso is_tuple(X) ->
+    {recv,{G, Pred, X, []}};
+pretty_format({Pred,X,U}) when is_function(Pred) andalso is_tuple(X) andalso is_list(U) ->
+    {recv,{fun(_) -> true end, Pred, X, U}};
+pretty_format({G,Pred,X,U}) when is_function(G) andalso is_function(Pred) andalso is_tuple(X) andalso is_list(U)  ->
+    {recv,{G,Pred,X,U}}.
+
+pretty_format_choice(L) ->
+    {_A,_} = hd(L),
+    T = element(1,pretty_format(_A)),
+    {T, [{element(2,pretty_format(A)), C} || {A,C} <- L]}.

@@ -12,7 +12,7 @@
 
 %% API
 -export([start_link/1,
-	 request_id/1,
+	 request_id/2,
 	 connect/2,
 	 register/1,
 	 unregister/2,
@@ -45,8 +45,8 @@ connect(Pid, List) ->
 request_parent(Pid) ->
     gen_server:call(Pid, request_parent).
 
-request_id(Pid) ->
-    gen_server:call(Pid, request_id).
+request_id(Pid, FromPid) ->
+    gen_server:cast(Pid, {request_id, [FromPid]}).
 
 send(Pid, Msg) ->
     gen_server:cast(Pid, {send, Msg}).
@@ -116,13 +116,8 @@ handle_call({star, List}, _From, #state{id = Id} = State) ->
     {reply, ok, State#state{parent = Parent, children = Children}};
 handle_call(register, {Pid, _}, #state{db = Table} = State) ->
     ets:insert(Table, {Pid}),
-    {reply, ok, State};
+    {reply, ok, State}.
 
-handle_call(request_id, _From, #state{parent = [], counter = Counter} = State) ->
-    {reply, Counter, State#state{counter = Counter + 1}};
-handle_call(request_id, From, #state{addr = Addr, parent = Pid} = State) ->
-    gen_server:cast(Pid, {request_id, [Addr, From]}),
-    {noreply, State}.
 
 
 %%--------------------------------------------------------------------
@@ -139,14 +134,18 @@ handle_cast({unregister, Pid}, #state{db = Table} = State) ->
     %io:format("Serving node ~p unregisters agent'scomponent ~p ~n",[Addr, Pid]),
     ets:delete(Table, Pid),
     {noreply, State};
-handle_cast({request_id, [From | T]}, #state{parent = [], counter = Counter} = State) ->
+handle_cast({request_id, [From]}, #state{parent = [], counter = Counter} = State) -> % root replies directly
+    gen_statem:cast(From, {timestamp, Counter}),
+    {noreply, State#state{counter = Counter + 1}};
+handle_cast({request_id, [From | T]}, #state{parent = [], counter = Counter} = State) -> % root forwards reply
     gen_server:cast(From, {reply_id, Counter, T}),
     {noreply, State#state{counter = Counter + 1}};
+
 handle_cast({request_id, From}, #state{addr = Addr, parent = Parent} = State) ->
     gen_server:cast(Parent, {request_id, [Addr | From]}),
     {noreply, State};
 handle_cast({reply_id, Counter, [From]}, State) ->
-    gen_server:reply(From, Counter),
+    gen_statem:cast(From, {timestamp, Counter}),
     {noreply, State};
 handle_cast({reply_id, Counter, [From | T]}, State) ->
     gen_server:cast(From, {reply_id, Counter, T}),

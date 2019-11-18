@@ -1,58 +1,36 @@
 %%%-------------------------------------------------------------------
-%%% @author tan duong <tanduong@localhost>
-%%% @copyright (C) 2018, tan duong
-%%% @doc
-%%%
-%%% @end
-%%% Created : 20 Jul 2018 by tan duong <tanduong@localhost>
+%% @doc abel top level supervisor.
+%% @end
 %%%-------------------------------------------------------------------
+
 -module(abel_sup).
 
 -behaviour(supervisor).
 
 %% API
--export([start_link/1, start_worker/3]).
+-export([start_link/0,
+	start_link/1,
+	 start_worker/3]).
 
 %% Supervisor callbacks
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
 
-%%%===================================================================
-%%% API functions
-%%%===================================================================
+%%====================================================================
+%% API functions
+%%====================================================================
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the supervisor
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
-%% @end
-%%--------------------------------------------------------------------
+start_link() ->
+    start_link(1).
+
 start_link(N) ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, [N]).
+%%====================================================================
+%% Supervisor callbacks
+%%====================================================================
 
-%%%===================================================================
-%%% Supervisor callbacks
-%%%===================================================================
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Whenever a supervisor is started using supervisor:start_link/[2,3],
-%% this function is called by the new process to find out about
-%% restart strategy, maximum restart intensity, and child
-%% specifications.
-%%
-%% @spec init(Args) -> {ok, {SupFlags, [ChildSpec]}} |
-%%                     ignore |
-%%                     {error, Reason}
-%% @end
-%%--------------------------------------------------------------------
-
-%%% there a set of tree servers, creating simple_one_for_one for testing purpose right now
-%%% this can be changed by specifiying a list of child specifications and use one_for_one instead
-
+%% Child :: {Id,StartFunc,Restart,Shutdown,Type,Modules}
 init([N]) ->
     SupFlags = #{strategy => one_for_one,
 		 intensity => 1,
@@ -73,12 +51,13 @@ init([N]) ->
 		      shutdown => 5000,
 		      type => worker,
 		      modules => ['abel_reg']},
-
     {ok, {SupFlags, [Registration | Children]}}.
 
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
+%    {ok, { {one_for_all, 0, 1}, []} }.
+
+%%====================================================================
+%% Internal functions
+%%====================================================================
 child_specs(Id, {M,F,A}, PoolTable) ->
     {Id, {?MODULE, start_worker, [Id,{M,F,A},PoolTable]}, permanent, 2000, worker, [M]}.
 

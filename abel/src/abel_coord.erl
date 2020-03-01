@@ -195,7 +195,7 @@ handle_event({call, From}, {send, {G, Msg, Pred, U}, Con}, {Env, Sending},
 	    abel_inf:send(Agent, {Mid, {NewPred, NewMsg, PublicEnv}, self()}),
 	    NewEnv = update_output(Env,U),
 	    gen_statem:reply(From, {Con,[]}),
-	    %attout(I,Env,NewMsg),
+	    attout(I,Env,NewMsg),
 
 	    Status2 = maps:remove(From, Status),
 	    %% if sucessfully send, then relies on environment change to retry deffered actions if any
@@ -211,9 +211,9 @@ handle_event({call, From}, {send, {G, Msg, Pred, U}, Con}, {Env, Sending},
 		false ->
 		    case Resend == 1 andalso NumProcs == maps:size(NewStatus) of
 			true ->
-			    io:format("resend of ~p = ~p mid = ~p bc of ~p with ~p ~n",[maps:with(I,Env), Resend, Mid,U, NewMsg]),
+			    %io:format("resend of ~p = ~p mid = ~p bc of ~p with ~p ~n",[maps:with(I,Env), Resend, Mid,U, NewMsg]),
 			    abel_inf:send(Agent, {Mid, {fun(_,_) -> false end, {}, #{}}, self()}),
-			    attout(I,Env,#{}),
+			    atteout(I,Env,#{}),
 			    {keep_state, Data#data{status = NewStatus, resend = Resend - 1, counter = Counter + 1, mid = -1}, [postpone]};
 		       false ->
 			    %io:format("false branch resend of ~p = ~p mid = ~p bc of ~p with ~p, where n = ~p, m = ~p ~n",[maps:with(I,Env), Resend, Mid,U, NewMsg, NumProcs, maps:size(NewStatus)]),
@@ -259,9 +259,9 @@ handle_event({call,From}, {choice, send, BehList}, {Env, Sending},
 		false ->
 		    case Resend == 1 andalso NumProcs == maps:size(NewStatus) of
 			true ->
-			    io:format("resend of ~p = ~p, mid = ~p ~n",[maps:with(I,Env), Resend,Mid]),
+			    %io:format("resend of ~p = ~p, mid = ~p ~n",[maps:with(I,Env), Resend,Mid]),
 			    abel_inf:send(Agent, {Mid, {fun(_,_) -> false end, {}, #{}}, self()}),
-			 %   attout(I,Env,#{}),
+			    atteout(I,Env,#{}),
 			    {keep_state, Data#data{status = NewStatus, resend = Resend - 1, counter = Counter + 1, mid = -1}, [postpone]};
 			false ->
 			    {keep_state, Data#data{status = NewStatus, resend = Resend - 1}, [postpone]}
@@ -351,7 +351,7 @@ handle_event(internal, receiving, {Env, Sending}, Data = #data{queue = Queue, pr
 	    case Result of
 		[] ->
 		    %MContent = element(2,Msg),
-		    %attd(I,Env,MContent),
+		    %%attd(I,Env,MContent),
 		    NewSending = if (Counter + 1 == Mid) -> not Sending; true -> Sending end, %state change
 		    NewResend = if (Counter + 1 == Mid) ->  maps:size(maps:filter(fun(_,S) -> S =:= sending end, Status)); true -> Resend end,
 		    handle_event(internal, receiving, {Env, NewSending}, Data#data{queue = Rest, resend = NewResend, counter = Counter + 1});
@@ -359,7 +359,7 @@ handle_event(internal, receiving, {Env, Sending}, Data = #data{queue = Queue, pr
 		    %%discard_message_and_reply
 		    MContent = element(2,Msg),
 		    NewEnv = update_input(Env,U,MContent),
-		    %attin(I,NewEnv,MContent),
+		    attin(I,NewEnv,MContent),
 		    gen_statem:reply(From, {Con,zip(X,MContent)}),
 		    NewStatus = maps:remove(From, Status),
 		    NewSending = if (Counter + 1 == Mid) -> not Sending; true -> Sending end, %state change
@@ -473,6 +473,10 @@ update_input(Env,U,M) ->
 attout(I,E,M) ->
     C = maps:with(I,E),
     io:format("Comp ~p sent ~p ~n",[C,M]).
+
+atteout(I,E,M) ->
+    C = maps:with(I,E),
+    io:format("Comp ~p sent empty message ~n",[C]).
 
 attin(I,E,M) ->
     C = maps:with(I,E),

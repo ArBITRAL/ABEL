@@ -6,7 +6,7 @@
 
 start(N) ->
     ok = abel:start(N),
-    Common = #{s => 1},
+    Common = #{s => true},
     I = {n,s},
     CompAddresses = lists:foldr(fun(X, Acc) ->
 					Env = maps:merge(#{n => X},Common),

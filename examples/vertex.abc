@@ -1,0 +1,33 @@
+component Vertex
+	  attributes: id, used, send, round, done, nbr, assigned, color, counter, constraints, constraints1, counter1
+	  observables: color, assigned
+	  behaviour:
+	  let {
+	      F := ('try', this.color, this.round)@(id in this.nbr).[counter := counter + 1]nil
+
+	      T := (x = 'try' and this.id > id and this.round = z)(x,y, z).[counter := counter + 1]T
+	          +
+		        (x = 'try' and this.id < id and this.round = z)(x,y, z).[counter := counter + 1, constraints := constraints ++ [y]]T
+		       +
+		        (x = 'try' and this.id > id and this.round < z)(x,y, z).[counter1 := counter1 + 1]T
+		        +
+		       (x = 'try' and this.id < id and this.round < z)(x,y, z).[counter1 := counter1 + 1, constraints1 := constraints1 ++ [y]]T
+
+             D := (x = 'done' and this.round = z)(x,y, z).[done := done + 1, used := used ++ [y]]D
+		      +
+	         (x = 'done' and this.round > z)(x,y, z).[done := done + 1, counter := counter + 1, used := used ++ [y]]D
+
+	     A := <(|nbr| + 1 = counter) and (color notin constraints ++ used)>('done', this.color, this.round)@(id in this.nbr).[assigned := tt]nil
+	           +
+	          <(|nbr| + 1 = counter) and  (color in constraints ++ used)>('try', this.color, this.round + 1)@(id in this.nbr).
+		    [round := round + 1, counter := done + counter1 + 1, constraints := constraints1, counter1 := 0, constraints1 := []]A
+	   }
+	   init  F | T | D | A
+
+end
+
+C1: Vertex (color -> 0, round -> 0, done -> 0, send -> tt, assigned -> ff, used -> [], constraints -> [], constraints1 -> [], counter -> 0, counter1 -> 0, id -> 1, nbr -> [2,4])
+C2: Vertex (color -> 0, round -> 0, done -> 0, send -> tt, assigned -> ff, used -> [], constraints -> [], constraints1 -> [], counter -> 0, counter1 -> 0, id -> 2, nbr -> [1,3])
+C3: Vertex (color -> 0, round -> 0, done -> 0, send -> tt, assigned -> ff, used -> [], constraints -> [], constraints1 -> [], counter -> 0, counter1 -> 0, id -> 3, nbr -> [2,5])
+C4: Vertex (color -> 0, round -> 0, done -> 0, send -> tt, assigned -> ff, used -> [], constraints -> [], constraints1 -> [], counter -> 0, counter1 -> 0, id -> 4, nbr -> [1,5])
+C5: Vertex (color -> 0, round -> 0, done -> 0, send -> tt, assigned -> ff, used -> [], constraints -> [], constraints1 -> [], counter -> 0, counter1 -> 0, id -> 5, nbr -> [3,4])
